@@ -99,6 +99,29 @@ def cmd_score(a):
     print(json.dumps({"summary": summary, "tunes": rows} if a.verbose else summary, indent=1))
 
 
+def cmd_play(a):
+    import re
+    import webbrowser
+    template = open(os.path.join(os.path.dirname(__file__), "player.html"), encoding="utf-8").read()
+    tunes = []
+    for path in a.abc:
+        text = open(path, encoding="utf-8").read().replace("\r\n", "\n").strip()
+        parts = [t.strip() for t in re.split(r"\n(?=X:)", text) if t.strip()]
+        if len(parts) <= 1:
+            parts = [t.strip() for t in re.split(r"\n\s*\n", text) if t.strip()]
+        tunes += parts
+    # keep a stray "</script>" in a tune from closing the page's script early
+    embedded = json.dumps(tunes).replace("</", "<\\/")
+    page = template.replace("/*TUNES*/[]", embedded, 1)
+    out = a.out or os.path.join("runs", "player.html")
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    with open(out, "w", encoding="utf-8") as f:
+        f.write(page)
+    print(f"{len(tunes)} tune(s) -> {out}")
+    if not a.no_open:
+        webbrowser.open("file://" + os.path.abspath(out))
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="jigai", description="Train, fine-tune, sample and score the Jig AI models.")
     p.add_argument("--data", default=os.environ.get("JIGAI_DATA", "data"), help="data folder (default: data)")
@@ -151,6 +174,12 @@ def main(argv=None):
     s.add_argument("--meter-aware", action="store_true", help="judge bars against each tune's own meter (slip jigs)")
     s.add_argument("--verbose", action="store_true")
     s.set_defaults(func=cmd_score)
+
+    s = sub.add_parser("play", help="open the jig player in your browser with these tunes loaded")
+    s.add_argument("abc", nargs="*", help=".abc files to load (none = an empty player you can drop files on)")
+    s.add_argument("--out", help="where to write the player page (default: runs/player.html)")
+    s.add_argument("--no-open", action="store_true", help="write the page without opening a browser")
+    s.set_defaults(func=cmd_play)
 
     a = p.parse_args(argv)
     a.func(a)

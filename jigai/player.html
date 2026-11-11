@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jig player</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.7.0/abcjs-basic-min.js"></script>
+<style>
+  :root { --ink: #16130f; --paper: #fbfaf6; --line: #d8d4ca; --mute: #6b665c; --accent: #c2410c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--paper); border-bottom: 1px solid var(--line); padding: 12px 20px; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+  h1 { font-size: 18px; margin: 0 12px 0 0; }
+  main { max-width: 1000px; margin: 0 auto; padding: 16px 20px 60px; display: grid; gap: 14px; }
+  button, select, label.btn { font: inherit; border: 1.5px solid var(--ink); background: #fff; color: var(--ink); border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+  button:hover, label.btn:hover { background: #f0ede4; }
+  button.playing { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .tune { border: 1.5px solid var(--ink); border-radius: 8px; background: #fff; padding: 10px 14px; }
+  .tune-head { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+  .tune-head b { font-size: 15px; }
+  .meta { color: var(--mute); font-size: 13px; }
+  .sheet { overflow-x: auto; }
+  .abcjs-highlight { fill: var(--accent); }
+  #drop { border: 2px dashed var(--line); border-radius: 8px; padding: 18px; color: var(--mute); text-align: center; }
+  #drop.over { border-color: var(--accent); color: var(--ink); }
+  textarea { width: 100%; min-height: 120px; font: 13px/1.4 ui-monospace, Menlo, monospace; border: 1.5px solid var(--line); border-radius: 6px; padding: 8px; }
+  details summary { cursor: pointer; color: var(--mute); }
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Jig player</h1>
+  <label class="btn" for="file">Open .abc file</label><input id="file" type="file" accept=".abc,.txt">
+  <label>Voice
+    <select id="voice">
+      <option value="73" selected>Flute</option>
+      <option value="110">Fiddle</option>
+      <option value="78">Tin whistle</option>
+      <option value="21">Accordion</option>
+      <option value="46">Harp</option>
+    </select>
+  </label>
+  <label>Speed
+    <select id="speed">
+      <option value="300">Slow</option>
+      <option value="260" selected>Relaxed</option>
+      <option value="200">Session</option>
+    </select>
+  </label>
+  <button id="stop" type="button">Stop</button>
+  <span class="meta" id="count"></span>
+</header>
+<main>
+  <div id="drop">Drop an .abc file here, or paste tunes below.</div>
+  <details id="pastebox"><summary>Paste ABC</summary>
+    <textarea id="paste" placeholder="X:1&#10;M:6/8&#10;L:1/8&#10;K:Dmajor&#10;|:A|dAF D2F|..."></textarea>
+    <button id="load" type="button">Show these tunes</button>
+  </details>
+  <div id="tunes"></div>
+</main>
+<script>
+// Tunes handed in by `jigai play` replace this empty list.
+const INITIAL = /*TUNES*/[];
+
+let ctx = null, synth = null, playingBtn = null, endTimer = null, cursorTimer = null;
+
+function splitTunes(text) {
+  const t = text.replace(/\r\n?/g, "\n").trim();
+  if (!t) return [];
+  const parts = t.split(/\n(?=X:)/).map((s) => s.trim()).filter(Boolean);
+  return (parts.length > 1 ? parts : t.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean))
+    .map((s) => (/^X:/m.test(s) ? s : "X:1\n" + s));
+}
+
+function header(abc, key) {
+  const m = abc.match(new RegExp("^" + key + ":\\s*(.*)$", "m"));
+  return m ? m[1].trim() : "";
+}
+
+function stopAll() {
+  if (synth) { try { synth.stop(); } catch (e) {} synth = null; }
+  clearTimeout(endTimer); clearInterval(cursorTimer);
+  document.querySelectorAll(".abcjs-highlight").forEach((el) => el.classList.remove("abcjs-highlight"));
+  if (playingBtn) { playingBtn.textContent = "Play"; playingBtn.classList.remove("playing"); playingBtn = null; }
+}
+
+async function play(btn, visualObj, abc) {
+  if (playingBtn === btn) { stopAll(); return; }
+  stopAll();
+  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === "suspended") await ctx.resume();
+  const mm = abc.match(/^M:\s*(\d+)\s*\/\s*(\d+)/m);
+  const eighths = mm ? (+mm[1]) * (8 / (+mm[2])) : 6;
+  const msPerMeasure = eighths * (+document.getElementById("speed").value);
+  synth = new ABCJS.synth.CreateSynth();
+  btn.textContent = "Loading…";
+  try {
+    await synth.init({ visualObj, audioContext: ctx, millisecondsPerMeasure: msPerMeasure,
+      options: { program: +document.getElementById("voice").value } });
+    await synth.prime();
+  } catch (e) { btn.textContent = "Play"; alertLine(btn, "Could not play this tune: " + (e.message || e)); return; }
+  synth.start();
+  playingBtn = btn; btn.textContent = "Stop"; btn.classList.add("playing");
+  endTimer = setTimeout(stopAll, (synth.duration || 30) * 1000 + 300);
+}
+
+function alertLine(btn, msg) {
+  const p = document.createElement("div"); p.className = "meta"; p.textContent = msg;
+  btn.closest(".tune").appendChild(p);
+}
+
+function show(tunes) {
+  stopAll();
+  const box = document.getElementById("tunes"); box.innerHTML = "";
+  document.getElementById("count").textContent = tunes.length ? tunes.length + " tune" + (tunes.length > 1 ? "s" : "") : "";
+  tunes.forEach((abc, i) => {
+    const el = document.createElement("section"); el.className = "tune";
+    const title = header(abc, "T") || "Tune " + (i + 1);
+    const info = [header(abc, "M"), header(abc, "K")].filter(Boolean).join(" · ");
+    el.innerHTML = '<div class="tune-head"><div><b></b> <span class="meta"></span></div><button type="button">Play</button></div><div class="sheet"></div>';
+    el.querySelector("b").textContent = title;
+    el.querySelector(".meta").textContent = info;
+    box.appendChild(el);
+    const visualObj = ABCJS.renderAbc(el.querySelector(".sheet"), abc, { responsive: "resize", add_classes: true })[0];
+    el.querySelector("button").addEventListener("click", (e) => play(e.currentTarget, visualObj, abc));
+  });
+}
+
+document.getElementById("stop").addEventListener("click", stopAll);
+document.getElementById("file").addEventListener("change", async (e) => {
+  const f = e.target.files[0]; if (f) show(splitTunes(await f.text()));
+});
+document.getElementById("load").addEventListener("click", () => show(splitTunes(document.getElementById("paste").value)));
+const drop = document.getElementById("drop");
+["dragover", "dragenter"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach((t) => drop.addEventListener(t, () => drop.classList.remove("over")));
+drop.addEventListener("drop", async (e) => {
+  e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) show(splitTunes(await f.text()));
+});
+
+if (INITIAL.length) show(INITIAL);
+</script>
+</body>
+</html>

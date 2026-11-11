@@ -50,11 +50,12 @@ jigai finetune --set slip --out runs/slip     # 120 steps, lr 3e-4: the tuned de
 jigai score runs/slip/samples.abc --meter-aware --pool slip
 ```
 
-Paste any tune from a `.abc` file into an ABC player to hear it, e.g. https://abc.rectanglered.com or https://editor.drawthedots.com.
+**Listen:** `jigai play samples.abc` opens the jig player in your browser with those tunes loaded: sheet music, Play/Stop, and the same sound as the activity (flute, relaxed jig tempo; fiddle, whistle and faster speeds in the menus). You can also open `jigai/player.html` directly and drop any `.abc` file on it. It needs an internet connection the first time, to load the abcjs library.
 
 ### All commands
 
 ```sh
+jigai play [file.abc ...]                                       # listen in the browser (sheet music + playback)
 jigai prepare-data [--source tunes.json]                        # optional: rebuild data/ from a fresh dump
 jigai train --songs 482 --steps 2400 [--out runs/x]             # N one-per-tune jigs, from scratch
 jigai train --corpus jigs --steps 6000 --vocab-from weights/tsALL-s6000-v1   # rebuild the strong model
