@@ -20,4 +20,4 @@ build-backend = "setuptools.build_meta"
 packages = ["jigai"]
 
 [tool.setuptools.package-data]
-jigai = ["player.html"]
+jigai = ["player/*.html", "player/*.js", "player/*.md", "player/soundfonts/*.txt", "player/soundfonts/*/*.mp3"]

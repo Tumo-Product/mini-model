@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Jig player</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.7.0/abcjs-basic-min.js"></script>
+<script src="abcjs-basic-min.js"></script>
 <style>
   :root { --ink: #16130f; --paper: #fbfaf6; --line: #d8d4ca; --mute: #6b665c; --accent: #c2410c; }
   * { box-sizing: border-box; }
@@ -37,8 +37,6 @@
       <option value="73" selected>Flute</option>
       <option value="110">Fiddle</option>
       <option value="78">Tin whistle</option>
-      <option value="21">Accordion</option>
-      <option value="46">Harp</option>
     </select>
   </label>
   <label>Speed
@@ -60,10 +58,10 @@
   <div id="tunes"></div>
 </main>
 <script>
-// Tunes handed in by `jigai play` replace this empty list.
-const INITIAL = /*TUNES*/[];
+// Sounds ship in soundfonts/ next to this page, so nothing is fetched from the internet.
+const SOUNDFONTS = "soundfonts/";
 
-let ctx = null, synth = null, playingBtn = null, endTimer = null, cursorTimer = null;
+let ctx = null, synth = null, playingBtn = null, endTimer = null;
 
 function splitTunes(text) {
   const t = text.replace(/\r\n?/g, "\n").trim();
@@ -80,7 +78,7 @@ function header(abc, key) {
 
 function stopAll() {
   if (synth) { try { synth.stop(); } catch (e) {} synth = null; }
-  clearTimeout(endTimer); clearInterval(cursorTimer);
+  clearTimeout(endTimer);
   document.querySelectorAll(".abcjs-highlight").forEach((el) => el.classList.remove("abcjs-highlight"));
   if (playingBtn) { playingBtn.textContent = "Play"; playingBtn.classList.remove("playing"); playingBtn = null; }
 }
@@ -97,7 +95,7 @@ async function play(btn, visualObj, abc) {
   btn.textContent = "Loading…";
   try {
     await synth.init({ visualObj, audioContext: ctx, millisecondsPerMeasure: msPerMeasure,
-      options: { program: +document.getElementById("voice").value } });
+      options: { program: +document.getElementById("voice").value, soundFontUrl: SOUNDFONTS } });
     await synth.prime();
   } catch (e) { btn.textContent = "Play"; alertLine(btn, "Could not play this tune: " + (e.message || e)); return; }
   synth.start();
@@ -139,7 +137,13 @@ drop.addEventListener("drop", async (e) => {
   e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) show(splitTunes(await f.text()));
 });
 
-if (INITIAL.length) show(INITIAL);
+// `jigai play` serves this page from a small local server along with tunes.json.
+if (location.protocol === "file:") {
+  document.getElementById("drop").textContent =
+    "Opened as a file: sheet music works, but browsers block the sounds. Run `jigai play` to hear the tunes.";
+} else {
+  fetch("tunes.json").then((r) => (r.ok ? r.json() : [])).then((t) => { if (t.length) show(t); }).catch(() => {});
+}
 </script>
 </body>
 </html>

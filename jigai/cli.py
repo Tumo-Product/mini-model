@@ -99,27 +99,50 @@ def cmd_score(a):
     print(json.dumps({"summary": summary, "tunes": rows} if a.verbose else summary, indent=1))
 
 
-def cmd_play(a):
+def read_tunes(paths):
     import re
-    import webbrowser
-    template = open(os.path.join(os.path.dirname(__file__), "player.html"), encoding="utf-8").read()
     tunes = []
-    for path in a.abc:
+    for path in paths:
         text = open(path, encoding="utf-8").read().replace("\r\n", "\n").strip()
         parts = [t.strip() for t in re.split(r"\n(?=X:)", text) if t.strip()]
         if len(parts) <= 1:
             parts = [t.strip() for t in re.split(r"\n\s*\n", text) if t.strip()]
         tunes += parts
-    # keep a stray "</script>" in a tune from closing the page's script early
-    embedded = json.dumps(tunes).replace("</", "<\\/")
-    page = template.replace("/*TUNES*/[]", embedded, 1)
-    out = a.out or os.path.join("runs", "player.html")
-    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
-    with open(out, "w", encoding="utf-8") as f:
-        f.write(page)
-    print(f"{len(tunes)} tune(s) -> {out}")
+    return tunes
+
+
+def cmd_play(a):
+    import functools
+    import http.server
+    import webbrowser
+    tunes = json.dumps(read_tunes(a.abc)).encode("utf-8")
+    root = os.path.join(os.path.dirname(__file__), "player")
+
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def do_GET(self):
+            if self.path.split("?")[0] == "/tunes.json":
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(tunes)))
+                self.end_headers()
+                self.wfile.write(tunes)
+                return
+            super().do_GET()
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", a.port), functools.partial(Handler, directory=root))
+    url = f"http://127.0.0.1:{server.server_address[1]}/"
+    print(f"{len(json.loads(tunes))} tune(s) loaded. Player at {url}  (works offline; Ctrl-C to stop)")
     if not a.no_open:
-        webbrowser.open("file://" + os.path.abspath(out))
+        webbrowser.open(url)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
 
 
 def main(argv=None):
@@ -177,8 +200,8 @@ def main(argv=None):
 
     s = sub.add_parser("play", help="open the jig player in your browser with these tunes loaded")
     s.add_argument("abc", nargs="*", help=".abc files to load (none = an empty player you can drop files on)")
-    s.add_argument("--out", help="where to write the player page (default: runs/player.html)")
-    s.add_argument("--no-open", action="store_true", help="write the page without opening a browser")
+    s.add_argument("--port", type=int, default=0, help="local port for the player (default: any free port)")
+    s.add_argument("--no-open", action="store_true", help="print the player address without opening a browser")
     s.set_defaults(func=cmd_play)
 
     a = p.parse_args(argv)

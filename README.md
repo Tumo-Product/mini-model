@@ -50,7 +50,7 @@ jigai finetune --set slip --out runs/slip     # 120 steps, lr 3e-4: the tuned de
 jigai score runs/slip/samples.abc --meter-aware --pool slip
 ```
 
-**Listen:** `jigai play samples.abc` opens the jig player in your browser with those tunes loaded: sheet music, Play/Stop, and the same sound as the activity (flute, relaxed jig tempo; fiddle, whistle and faster speeds in the menus). You can also open `jigai/player.html` directly and drop any `.abc` file on it. It needs an internet connection the first time, to load the abcjs library.
+**Listen:** `jigai play samples.abc` opens the jig player in your browser with those tunes loaded: sheet music, Play/Stop, and the same sound as the activity (flute at a relaxed jig tempo; fiddle, tin whistle and a faster speed in the menus). You can also drop any `.abc` file on the page. It works fully offline: abcjs and the instrument sounds ship in `jigai/player/`, and `jigai play` serves them from a small local server on your machine (Ctrl-C to stop). Opening `index.html` as a plain file shows the sheet music, but browsers block the sounds that way.
 
 ### All commands
 
