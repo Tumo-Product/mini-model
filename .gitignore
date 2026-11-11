@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+runs/
+weights/**/model.pt
+.pytest_cache/
+*.egg-info/

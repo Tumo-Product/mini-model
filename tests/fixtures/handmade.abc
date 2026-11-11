@@ -1,0 +1,54 @@
+X:1
+T:Test Tune One
+R:jig
+M:6/8
+L:1/8
+K:Dmajor
+|:DFA AFA|dfe dBA|GBd cAG|FAF E2D|
+DFA AFA|dfe dBA|GBG FAF|EDE D3:|
+|:fga afd|gfe dcB|AFA dfa|gfe e2f|
+fga afd|gfe dBA|GBd cAG|FED D3:|
+
+X:2
+T:Test Tune Two
+R:jig
+M:6/8
+L:1/8
+K:Edorian
+|:EBB BAG|FDF AFD|EBB BAG|1 FAF E2D:|2 FAF E3||
+|:eBe gfe|dBd fed|eBe gfe|dBA B2A:|
+
+X:3
+T:Test Slip
+R:slip jig
+M:9/8
+L:1/8
+K:Gmajor
+|:GAB dBG AFD|GAB dBG A2G|GAB dBG AFD|BAG AFD G3:|
+|:dgg fgf edB|dgg fgf a2g|dgg fgf edB|BAG AFD G3:|
+
+X:4
+T:Chords and Ornaments
+M:6/8
+L:1/8
+K:Aminor
+"Am"A2B c2d|"G"~B3 GAB|"Am"{c}A2B c2e|"E"dcB A3|
+"Am"A2B c2d|"G"BAG GAB|"C"cBA "E"BAG|"Am"A3 A3||
+
+X:5
+T:No Key Line
+M:6/8
+abc def|gab c'ba|gfe dcB|A3 A3|
+
+X:6
+T:Run On
+M:6/8
+L:1/8
+K:G
+GAB GAB|dBG dBG|GAB GAB|dBG G3|GAB GAB|dBG dBG|GAB GAB|dBG G3|GAB GAB|dBG dBG|GAB GAB|dBG G3|GAB GAB|dBG dBG|GAB GAB|dBG G3|GAB GAB|dBG dBG|GAB GAB|dBG G3|GAB GAB|dBG dBG|GAB GAB|dBG G3|GAB GAB|dBG dBG|
+X:7
+T:Second tune glued on
+M:6/8
+L:1/8
+K:D
+d3 AFA|d3 e2f|

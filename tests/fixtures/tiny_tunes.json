@@ -1,0 +1,8 @@
+[
+ {"tune_id": 1, "name": "Handmade One", "type": "jig", "meter": "6/8", "mode": "Dmajor", "abc": "|:DFA AFA|dfe dBA|GBd cAG|FAF E2D|\r\nDFA AFA|dfe dBA|GBG FAF|EDE D3:|"},
+ {"tune_id": 1, "name": "Handmade One", "type": "jig", "meter": "6/8", "mode": "Dmajor", "abc": "|:DFA ABA|dfe dBA|GBd cAG|FAF E2D|\r\nDFA AFA|dfe dBA|GBG FAF|EDE D3:|"},
+ {"tune_id": 2, "name": "Handmade Two", "type": "jig", "meter": "6/8", "mode": "Edorian", "abc": "|:EBB BAG|FDF AFD|EBB BAG|FAF E3:|"},
+ {"tune_id": 3, "name": "Handmade Three", "type": "jig", "meter": "6/8", "mode": "Aminor", "abc": "|:A2B c2d|B3 GAB|A2B c2e|dcB A3:|"},
+ {"tune_id": 4, "name": "Handmade Slip", "type": "slip jig", "meter": "9/8", "mode": "Gmajor", "abc": "|:GAB dBG AFD|GAB dBG A2G|BAG AFD G3:|"},
+ {"tune_id": 5, "name": "Handmade Reel", "type": "reel", "meter": "4/4", "mode": "Dmajor", "abc": "|:DFAF DFAF|dfed BAFA:|"}
+]
