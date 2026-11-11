@@ -79,14 +79,35 @@ Your local `data/` and `weights/` are uploaded with each job, and results come b
 
 ## How long things take
 
-| job | Modal (measured) | laptop (ESTIMATE, not measured) |
+| job | Modal (measured) | laptop: Apple M4 Pro, 24 GB, MPS (measured 2026-11-11) |
 |---|---|---|
-| generate 16 tunes | a few s on a warm T4 | **44 s measured** on an M-series Mac (MPS) |
-| fine-tune (dark 40 steps / slip 120 steps) | 1–10 s training, 8–14 s per request warm, ~15 s cold | ~1–5 min on Apple MPS; longer on CPU |
-| train 482 songs × 2,400 steps | ~7 min on an L4 (~$0.10) | ~1–3 h on Apple MPS; many hours on CPU |
-| train the strong model (14k × 6,000) | 975 s (~16 min) on an L4, ~$0.40 | ~3–8 h on Apple MPS; impractical on CPU |
+| generate 16 tunes | a few s on a warm T4 | 44 s |
+| fine-tune on a style set (dark 40 / slip 120 steps) | 1–10 s training, 8–14 s per request warm, ~15 s cold | about 25 s of training (a dozen slip jigs + the slip set, 120 steps); under a minute end to end, ~1 GB memory |
+| train 482 songs × 2,400 steps | ~7 min on an L4 (~$0.10) | not timed; expect roughly 35–40 min (same speed per step as below) |
+| train the strong model (14k × 6,000) | 975 s (~16 min) on an L4, ~$0.40 | **1 h 33 min**, peak memory ~15.8 GB (GPU memory shares system RAM on Macs) |
 
-The laptop figures are rough guesses from model size and batch (128 × 256 characters per step), not timings. Try `--dry-run`, then a few hundred steps, before committing to a long local run.
+CPU-only machines will be much slower. Try `--dry-run`, then a few hundred steps, before committing to a long local run.
+
+**Is the laptop model as good?** Yes. The strong model trained locally (final loss 0.70) against the Modal-trained `tsALL-s6000-v1`, 48 tunes each from `jigai generate --seed 1`, scored with `--pool jigs_first`:
+
+| | laptop | Modal |
+|---|---|---|
+| goodness | 81.4 | 74.4 |
+| passes the floor rule | 69% | 40% |
+| dark keys | 9 of 48 | 8 of 48 |
+| copies ≥35% | 0 | 0 |
+
+Same recipe on both, so read this as "equally good" rather than better: one seed and 48 tunes is a small sample.
+
+**Fine-tuning a dozen tunes locally** (12 slip jigs as `--abc`, from the strong model; 16 outputs each):
+
+| recipe | training time | slip jigs | copies ≥35% |
+|---|---|---|---|
+| the dozen only, 120 steps | 11 s | 12 of 16 | **16 of 16**: it memorised them |
+| the dozen only, 30 steps | 2.5 s | 2 of 16 | 0 |
+| the dozen + the slip set (`--set slip`), 120 steps | 25 s | **15 of 16** | **0** |
+
+Mix a small personal set with a style set, or the model just recites it.
 
 ## What we found
 
@@ -161,7 +182,7 @@ At about n=30, roughly level. folk-rnn stops more cleanly (16–32 bars); ours s
 - **9/8 scoring is new** and lightly tested. `goodness` and the floor rule were designed for 6/8.
 - The 482-song checkpoint came from an older 2,000-tune book that isn't included. `train --songs 482` draws 482 jigs from The Session data instead, so it won't reproduce that checkpoint exactly.
 - `score --pool jigs` (14k tunes) runs the copy check against ~3.7 MB of text and is slow, about seconds per tune.
-- Laptop training times above are estimates.
+- The laptop timings come from one Mac (M4 Pro); other machines will differ.
 - Sample sizes in "What we found" are small; see each table.
 
 ## Tests

@@ -29,8 +29,14 @@ def _amp(device):
     return torch.autocast("cpu", enabled=False), None
 
 
+def _log(msg):
+    # flush so progress shows up when output goes to a file or a pipe
+    print(msg, flush=True)
+
+
 def train(blocks, steps, out_dir, vocab_chars=None, seed=0, device=None, compile_model=False, num_samples=8,
-          dry_run=False, log=print):
+          dry_run=False, log=None):
+    log = log or _log
     device = pick_device(device)
     text = "\n\n".join(blocks) + "\n"
     vocab = Vocab(vocab_chars or sorted(set(text)))
@@ -102,7 +108,8 @@ def build_finetune_text(extra, set_blocks, extra_weight, vocab, seed):
 
 
 def finetune(base_dir, out_dir, set_blocks=(), set_name=None, extra=(), steps=None, lr=None, seed=0,
-             device=None, num_samples=16, dry_run=False, log=print):
+             device=None, num_samples=16, dry_run=False, log=None):
+    log = log or _log
     d = SET_DEFAULTS.get(set_name, SET_DEFAULTS[None])
     steps = steps or d["steps"]
     lr = lr or d["lr"]
