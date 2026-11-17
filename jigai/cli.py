@@ -79,7 +79,7 @@ def cmd_score(a):
         tunes = _split_tunes(f.read())
     pool = []
     if a.pool:
-        blocks = data.load(a.pool, a.data) if not os.path.exists(a.pool) else json.load(open(a.pool))
+        blocks = data.load_pool(a.pool, a.data)
         pool = [{"title": b.split("\n", 2)[1][2:] if b.count("\n") > 1 else None, "abc": b} for b in blocks]
     rows = []
     for t in tunes:
@@ -97,6 +97,47 @@ def cmd_score(a):
                "copies_35pct_plus": sum(r["copied"] >= 35 for r in rows),
                "pool": a.pool or "none (style and copy checks need --pool)"}
     print(json.dumps({"summary": summary, "tunes": rows} if a.verbose else summary, indent=1))
+
+
+def cmd_c4_data(a):
+    from . import connect4
+    path = os.path.join(a.data, f"{a.name}.json")
+    if os.path.exists(path):  # e.g. --name jigs: don't replace a tune corpus with games
+        try:
+            with open(path) as f:
+                old = json.load(f)
+        except ValueError:
+            old = None
+        if not isinstance(old, list) or (old and not str(old[0]).startswith(connect4.HEADER)):
+            sys.exit(f"{path} already exists and isn't a Connect Four corpus: pick another --name.")
+    blocks = connect4.generate_games(a.games, a.seed, a.bot, a.eps)
+    os.makedirs(a.data, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(blocks, f)
+    summary, _ = connect4.score_text("\n\n".join(blocks))
+    print(json.dumps({"wrote": path, "games": len(blocks), "chars": sum(len(b) + 2 for b in blocks),
+                      "bot": a.bot, "eps": a.eps, "seed": a.seed, "mean_moves": summary["mean_moves"],
+                      "winners": summary["winners"]}, indent=1))
+    if len(blocks) < a.games:
+        print(f"note: only {len(blocks)} distinct games found; raise --eps for more variety", file=sys.stderr)
+
+
+def cmd_c4_score(a):
+    from . import connect4, data
+    with open(a.file) as f:
+        text = f.read()
+    pool = data.load_pool(a.pool, a.data) if a.pool else None
+    summary, rows = connect4.score_text(text, pool)
+    print(json.dumps({"summary": summary, "games": rows} if a.verbose else summary, indent=1))
+
+
+def cmd_c4_eval(a):
+    import torch
+    from . import connect4
+    from .model import load_checkpoint
+    torch.manual_seed(a.seed)
+    model, vocab, _ = load_checkpoint(a.model, a.device)
+    print(json.dumps(connect4.play_vs_bot(model, vocab, a.n, a.opponent, a.temperature, a.seed), indent=1))
 
 
 def read_tunes(paths):
@@ -203,6 +244,29 @@ def main(argv=None):
     s.add_argument("--port", type=int, default=0, help="local port for the player (default: any free port)")
     s.add_argument("--no-open", action="store_true", help="print the player address without opening a browser")
     s.set_defaults(func=cmd_play)
+
+    s = sub.add_parser("c4-data", help="Connect Four: write self-play games to data/<name>.json for `train --corpus`")
+    s.add_argument("--games", type=int, default=100_000)
+    s.add_argument("--bot", choices=["smart", "random"], default="smart")
+    s.add_argument("--eps", type=float, default=0.1, help="chance of a random move, keeps smart games varied")
+    s.add_argument("--seed", type=int, default=0)
+    s.add_argument("--name", default="connect4", help="corpus name (default: connect4)")
+    s.set_defaults(func=cmd_c4_data)
+
+    s = sub.add_parser("c4-score", help="Connect Four: check generated games (legal moves, endings, copies)")
+    s.add_argument("file", help="text file of generated games, e.g. from `jigai generate --out` (not --raw: "
+                                "raw samples end mid-game, and the cut-off game would count as a mistake)")
+    s.add_argument("--pool", help="training corpus name or JSON file, for the copy check (e.g. connect4)")
+    s.add_argument("--verbose", action="store_true")
+    s.set_defaults(func=cmd_c4_score)
+
+    s = sub.add_parser("c4-eval", help="Connect Four: the model plays games against a bot")
+    s.add_argument("--model", required=True)
+    s.add_argument("-n", type=int, default=200, help="games (the model moves first in half)")
+    s.add_argument("--opponent", choices=["random", "smart"], default="random")
+    s.add_argument("--temperature", type=float, default=0.0, help="0 = always its most likely legal move")
+    s.add_argument("--seed", type=int, default=0)
+    s.set_defaults(func=cmd_c4_eval)
 
     a = p.parse_args(argv)
     a.func(a)

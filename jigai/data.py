@@ -81,6 +81,24 @@ def load(name, data_dir=DATA_DIR):
         return json.load(f)
 
 
+def load_pool(name_or_path, data_dir=DATA_DIR):
+    """A corpus name (data/<name>.json) or the path of a JSON list of blocks, for the copy checks."""
+    if os.path.exists(name_or_path):
+        with open(name_or_path) as f:
+            return json.load(f)
+    return load(name_or_path, data_dir)
+
+
+def split_blocks(text):
+    """Text holding several X: blocks (tunes or games) -> the blocks, each stripped and starting with X:."""
+    blocks = []
+    for c in text.replace("\r\n", "\n").split("\nX:"):
+        c = c.strip()
+        if c:
+            blocks.append(c if c.startswith("X:") else "X:" + c)
+    return blocks
+
+
 def songs_subset(n, seed=0, data_dir=DATA_DIR):
     """N distinct jigs (one setting each), a fixed random draw so runs are comparable."""
     pool = load("jigs_first", data_dir)
@@ -94,9 +112,5 @@ def read_abc_files(paths):
     tunes = []
     for p in paths or []:
         with open(p) as f:
-            text = f.read().replace("\r\n", "\n")
-        for c in text.split("\nX:"):
-            c = c.strip()
-            if c:
-                tunes.append(c if c.startswith("X:") else "X:" + c)
+            tunes += split_blocks(f.read())
     return tunes

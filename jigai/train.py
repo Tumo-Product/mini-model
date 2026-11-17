@@ -20,6 +20,8 @@ SET_DEFAULTS = {
     None: {"steps": 20, "lr": 1e-4, "set_size": 0, "extra_weight": 0.5},
 }
 STEP_CEILING = {"dark": 60, "slip": 120}
+EVAL_EVERY = 100
+EVAL_BATCHES = 8
 
 
 def _amp(device):
@@ -43,6 +45,7 @@ def train(blocks, steps, out_dir, vocab_chars=None, seed=0, device=None, compile
     data = torch.tensor(vocab.encode(text), dtype=torch.long)
     n = int(0.9 * len(data))
     train_data = data[:n] if n > ARCH["block_size"] else data
+    val_data = data[n:] if len(data) - n > ARCH["block_size"] + 1 else None
     block = ARCH["block_size"]
     batch = min(128, max(1, len(train_data) // block))
     torch.manual_seed(seed)
@@ -51,9 +54,25 @@ def train(blocks, steps, out_dir, vocab_chars=None, seed=0, device=None, compile
         f"{steps} steps on {device} ({sum(p.numel() for p in model.parameters()) / 1e6:.1f}M params)")
     offs = torch.arange(block)
 
-    def get_batch():
-        ix = torch.randint(max(1, len(train_data) - block - 1), (batch,))
-        return train_data[ix[:, None] + offs].to(device), train_data[ix[:, None] + offs + 1].to(device)
+    def get_batch(src=None, gen=None):
+        src = train_data if src is None else src
+        ix = torch.randint(max(1, len(src) - block - 1), (batch,), generator=gen)
+        return src[ix[:, None] + offs].to(device), src[ix[:, None] + offs + 1].to(device)
+
+    eval_gen = torch.Generator()
+
+    @torch.no_grad()
+    def estimate_loss(iters=EVAL_BATCHES):
+        # Its own generator, re-seeded each time: every check scores the same batches, and the training
+        # batches for a given seed are the same whether or not (and however often) this runs.
+        eval_gen.manual_seed(seed)
+        model.eval()
+        out = {}
+        for name, src in (("train_eval", train_data), ("val_loss", val_data)):
+            if src is not None:
+                out[name] = round(sum(model(*get_batch(src, eval_gen))[1].item() for _ in range(iters)) / iters, 4)
+        model.train()
+        return out
 
     if dry_run:
         xb, yb = get_batch()
@@ -79,9 +98,13 @@ def train(blocks, steps, out_dir, vocab_chars=None, seed=0, device=None, compile
         scaler.update()
         sched.step()
         if step % 50 == 0 or step == steps - 1:
-            history.append({"step": step, "loss": round(loss.item(), 4)})
+            entry = {"step": step, "loss": round(loss.item(), 4)}
+            if step % EVAL_EVERY == 0 or step == steps - 1:
+                entry.update(estimate_loss())
+            history.append(entry)
             if step % 500 == 0 or step == steps - 1:
-                log(f"  step {step + 1}/{steps} loss {loss.item():.4f} ({time.time() - t0:.0f}s)")
+                val = f" val {entry['val_loss']:.4f}" if "val_loss" in entry else ""
+                log(f"  step {step + 1}/{steps} loss {loss.item():.4f}{val} ({time.time() - t0:.0f}s)")
     tunes = sample(model, vocab, n=num_samples) if num_samples else []
     save_checkpoint(out_dir, model, vocab, {"type": "train", "steps": steps, "songs": len(blocks),
                                             "corpus_chars": len(text), "loss_history": history,
