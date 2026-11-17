@@ -19,14 +19,18 @@ extra terms at the top. The extra terms include:
 
 with an exception only for accessibility for disabled people.
 
-What this means for this project, as we read it (not legal advice; ask whoever handles licensing at TUMO):
+## Permission from The Session
 
-- The model here is a **10.8M-parameter character-level GPT**. It is far smaller than what is usually called
-  a "large" language model, but it is the same kind of model, and the clause is written broadly.
-  **Whether training it on The Session's data is allowed is an open question.** Decide before training.
-- The clause also covers **processing the data with LLM tools**. That includes AI coding assistants
-  (Claude, Copilot, ChatGPT) reading the tune files, and LLM-based tutors or chat features built on the data.
-  Earlier experiments in this project did run AI agents over the corpus, which this clause may not allow.
+TUMO asked Jeremy Keith, who runs The Session, for permission to use The Session's tune data in this
+activity, and how he would like The Session to be credited. He replied by email on 2026-11-17:
+
+> No problem using the data from The Session.
+
+So this project may use The Session's data for the activity, including training the model on it. The email is
+kept by the TUMO team; ask them for a copy.
+
+He didn't say how The Session should be credited, so we keep the ODbL credit below. The permission was asked
+for and given for this activity: ask again before using the data for something else.
 
 ## ODbL obligations (if you share data or results)
 
@@ -35,9 +39,9 @@ What this means for this project, as we read it (not legal advice; ask whoever h
 - If you **publicly use a "Produced Work"**, for example generated tunes shown to people, include a notice like:
   *"Contains information from The Session, which is made available here under the Open Database License (ODbL)."*
 - Using it internally within an organisation is not "public" use under the ODbL (section 4.5c).
-  The LLM clause, however, is not limited to public use.
 
 ## Model weights
 
-The checkpoints in `weights/` (shared separately, not in git) were trained on this data, so the same questions
-apply to them.
+The checkpoints in `weights/` (shared separately, not in git) were trained on this data. `tsALL-s6000-v1` is
+covered by the permission above for use in the activity. `d482-s2400` was trained on 482 jigs from an older
+2,000-tune book that isn't in this repo; its licence wasn't recorded, so check it before releasing it.

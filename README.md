@@ -8,7 +8,7 @@ A small **character-level GPT (10.8M parameters)** that learns to write Irish ji
 
 It's the model side of that activity, packaged to run on its own: on your laptop, or optionally on a Modal GPU.
 
-> **Read [NOTICE.md](NOTICE.md) first.** The tunes come from The Session's open data, whose licence includes a clause prohibiting use with Large Language Models. The tune data is in `data/`.
+> **Read [NOTICE.md](NOTICE.md) first.** The tunes come from The Session's open data, whose licence includes a clause prohibiting use with Large Language Models. The Session has given permission to use the data for this activity; NOTICE.md says what that covers. The tune data is in `data/`.
 
 ## What's here
 
@@ -178,7 +178,7 @@ At about n=30, roughly level. folk-rnn stops more cleanly (16–32 bars); ours s
 
 ## Known gaps
 
-- **Licence:** see NOTICE.md. It needs a decision before anyone trains on, or redistributes, the data or the weights.
+- **Licence:** The Session gave permission to use its data for this activity, including training (see NOTICE.md). Ask again before using the data for anything else, and check where the `d482-s2400` checkpoint's tunes came from before releasing it.
 - **9/8 scoring is new** and lightly tested. `goodness` and the floor rule were designed for 6/8.
 - The 482-song checkpoint came from an older 2,000-tune book that isn't included. `train --songs 482` draws 482 jigs from The Session data instead, so it won't reproduce that checkpoint exactly.
 - `score --pool jigs` (14k tunes) runs the copy check against ~3.7 MB of text and is slow, about seconds per tune.
