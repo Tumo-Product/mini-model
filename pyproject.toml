@@ -1,7 +1,7 @@
 [project]
 name = "jigai"
 version = "0.1.0"
-description = "A small character-level GPT that writes Irish jigs in ABC notation: train, fine-tune, sample, score."
+description = "A small character-level GPT (microgpt) and two things it learns from text: Irish jigs (jigai) and Connect Four (connect4)."
 requires-python = ">=3.10,<3.13"
 dependencies = ["torch==2.5.1", "numpy<2"]
 
@@ -11,13 +11,14 @@ dev = ["pytest==8.3.3"]
 
 [project.scripts]
 jigai = "jigai.cli:main"
+connect4 = "connect4.cli:main"
 
 [build-system]
 requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["jigai"]
+packages = ["microgpt", "jigai", "connect4"]
 
 [tool.setuptools.package-data]
 jigai = ["player/*.html", "player/*.js", "player/*.md", "player/soundfonts/*.txt", "player/soundfonts/*/*.mp3"]

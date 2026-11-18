@@ -4,8 +4,8 @@ import os
 
 import torch
 
-from jigai.model import ARCH, MicroGPT, Vocab, load_checkpoint, save_checkpoint
-from jigai.train import build_finetune_text
+from jigai.finetune import build_finetune_text
+from microgpt.model import ARCH, MicroGPT, Vocab, load_checkpoint, save_checkpoint
 
 
 def test_param_count_and_forward():

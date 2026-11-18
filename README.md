@@ -13,16 +13,22 @@ It's the model side of that activity, packaged to run on its own: on your laptop
 ## What's here
 
 ```
-jigai/model.py   the MicroGPT (6 layers, 6 heads, width 384, 256-char context), load/save, sampling
-jigai/data.py    builds data/ from The Session dump: all 6/8 jigs, one-per-tune jigs, dark set, slip set
-jigai/train.py   train from scratch; fine-tune with the tuned per-set defaults
-jigai/score.py   Python port of the activity's scoring (checked against the JavaScript in tests/)
-jigai/cli.py     `jigai prepare-data | train | finetune | generate | score`
-jigai/connect4.py  Connect Four as text: game generator, generated-game checks, model-vs-bot play (see below)
-modal_app.py     the same train / finetune / generate on a Modal GPU (optional)
+microgpt/        the shared core: knows nothing about tunes or games
+  model.py       the MicroGPT (6 layers, 6 heads, width 384, 256-char context), load/save, sampling
+  train.py       train from scratch on any text made of X: blocks
+  blocks.py      split, cut, read and write X: blocks
+jigai/           Irish jigs, built on microgpt
+  data.py        builds data/ from The Session dump: all 6/8 jigs, one-per-tune jigs, dark set, slip set
+  finetune.py    fine-tune with the tuned per-set defaults
+  score.py       Python port of the activity's scoring (checked against the JavaScript in tests/)
+  cli.py         `jigai prepare-data | train | finetune | generate | score | play`
+connect4/        Connect Four as text, built on microgpt: `connect4 data | train | generate | score | eval`
+modal_app.py     the same jig train / finetune / generate on a Modal GPU (optional)
 weights/         two trained checkpoints, model.pt not in git (about 45 MB each, get them from the owner)
 tests/           unit tests + the JS reference copies the scoring port is checked against
 ```
+
+`jigai` and `connect4` don't import each other. If you installed before the packages were split, run the install line below again: it registers `microgpt`, `connect4` and the `connect4` command.
 
 The two checkpoints:
 
@@ -179,45 +185,7 @@ At about n=30, roughly level. folk-rnn stops more cleanly (16–32 bars); ours s
 
 ## Connect Four
 
-The same model and `train` command also learn Connect Four, with games written as text instead of tunes. `jigai/connect4.py` holds the rules, the data generator and the checks. One game is one block:
-
-```
-X:c4
-4453342271
-W:1
-```
-
-The second line lists the moves, one digit per move: the column (1–7) the piece was dropped in, player 1 first. `W:` gives the winner (1 or 2), or 0 for a draw. A game is at most 51 characters, so the whole game always fits in the 256-character window.
-
-```sh
-jigai c4-data                                        # 100,000 distinct self-play games -> data/connect4.json (~30 s)
-jigai train --corpus connect4 --steps 600 --out runs/c4
-jigai train --corpus connect4 --songs 2000 --steps 600 --out runs/c4-2k   # fewer games, same steps
-jigai generate --model runs/c4 -n 64 --out runs/c4/games.txt
-jigai c4-score runs/c4/games.txt --pool connect4     # does it write real games?
-jigai c4-eval --model runs/c4 --opponent random      # can it play? (also --opponent smart)
-```
-
-- **The data** comes from a "smart" bot playing itself: it wins when it can, blocks when it must, avoids setting up the opponent's win, and otherwise prefers the centre. 10% of its moves are random (`--eps`) so games stay varied. `--bot random` gives games between random players, which makes a weaker training set to compare against.
-- **`c4-score`** checks games the model writes on its own. Score the file `generate` writes by default (one whole game per sample). With `--raw`, each sample ends mid-game and that cut-off game would count as a mistake.
-  - `legal_move_pct`: share of moves that are legal. An illegal move is skipped and the replay carries on; moves written after the game has ended all count as illegal.
-  - `clean_game_pct`: share of games that are legal and stop exactly when someone wins or the board fills.
-  - `result_correct_pct`: share of clean games whose `W:` line names the right winner.
-  - `copied_pct`: share of games identical to a training game, the counterpart of the jig copy check.
-- **`c4-eval`** plays real games against a bot, with the model moving first in half of them. `top_choice_legal_pct` is how often the model's first choice was a legal column. The move it actually plays is its most likely legal column, so an illegal guess never ends a game early.
-
-**First run** (100k games, 600 steps, final loss 1.44; 23 min on a busy M-series Mac via MPS, measured 2026-11-12). This is one seed with 200 games per row, so treat the numbers as rough:
-
-| check | result |
-|---|---|
-| plays against a random player | wins 85.5% (86% moving first, 85% moving second) |
-| plays against the smart bot | wins 10.5%, loses 88.5% |
-| games it writes on its own: legal moves | 60% |
-| games it writes on its own: clean games | 1 of 200 (0.5%) |
-| first mistake in those 200 games | 90 played on after the game had ended, 69 stopped before the end, 40 dropped into a full column |
-| copies of a training game | 0 |
-
-It picks reasonable moves, but at 600 steps it hasn't learned to tell when a game is over. That needs win detection, which is harder than choosing a move. Longer training (the jig model's 6,000 steps) is the next thing to try.
+The same model and training loop also learn Connect Four, from games written as text. That code is its own package, `connect4/`, with its own `connect4` command; it shares only `microgpt/` with the jig code. See [connect4/README.md](connect4/README.md) for the commands and the first results.
 
 ## Known gaps
 

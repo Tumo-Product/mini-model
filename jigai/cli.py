@@ -5,15 +5,12 @@ import json
 import os
 import sys
 
+from microgpt import blocks
 
 
-def _write_abc(tunes, path, raw=False):
-    from .score import first_tune
-    if not raw:
-        tunes = [first_tune(t) for t in tunes]  # one tune per generation, as the activity scores them
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    with open(path, "w") as f:
-        f.write("\n\n".join(t.strip() for t in tunes) + "\n")
+def _write_samples(tunes, out_dir):
+    # one tune per generation, as the activity scores them
+    blocks.write_blocks([blocks.first_block(t) for t in tunes], os.path.join(out_dir, "samples.abc"))
 
 
 def cmd_prepare(a):
@@ -23,52 +20,48 @@ def cmd_prepare(a):
 
 
 def cmd_train(a):
-    from . import data, train
+    from microgpt import train
+    from . import data
     if a.songs and a.songs > 0 and a.corpus == "jigs_first":
-        blocks = data.songs_subset(a.songs, a.seed, a.data)
+        tunes = data.songs_subset(a.songs, a.seed, a.data)
     else:
-        blocks = data.load(a.corpus, a.data)
+        tunes = data.load(a.corpus, a.data)
         if a.songs:
-            blocks = blocks[:a.songs]
+            tunes = tunes[:a.songs]
     vocab = None
     if a.vocab_from:
         with open(os.path.join(a.vocab_from, "config.json")) as f:
             vocab = json.load(f)["vocab"]
-    out = a.out or os.path.join("runs", f"s{len(blocks)}-x{a.steps}")
-    tunes = train.train(blocks, a.steps, out, vocab, a.seed, a.device, a.compile, a.samples, a.dry_run)
-    if tunes:
-        _write_abc(tunes, os.path.join(out, "samples.abc"))
+    out = a.out or os.path.join("runs", f"s{len(tunes)}-x{a.steps}")
+    samples = train.train(tunes, a.steps, out, vocab_chars=vocab, seed=a.seed, device=a.device,
+                          compile_model=a.compile, num_samples=a.samples, dry_run=a.dry_run, unit="tunes")
+    if samples:
+        _write_samples(samples, out)
 
 
 def cmd_finetune(a):
-    from . import data, train
+    from . import data, finetune
     set_blocks = data.load(a.set, a.data) if a.set else []
     extra = data.read_abc_files(a.abc)
     if not set_blocks and not extra:
         sys.exit("Give --set dark|slip and/or --abc files to fine-tune on.")
     out = a.out or os.path.join("runs", f"ft-{a.set or 'abc'}-{os.path.basename(os.path.normpath(a.base))}")
-    tunes = train.finetune(a.base, out, set_blocks, a.set, extra, a.steps, a.lr, a.seed, a.device, a.samples, a.dry_run)
+    tunes = finetune.finetune(a.base, out, set_blocks, a.set, extra, steps=a.steps, lr=a.lr, seed=a.seed,
+                              device=a.device, num_samples=a.samples, dry_run=a.dry_run)
     if tunes:
-        _write_abc(tunes, os.path.join(out, "samples.abc"))
+        _write_samples(tunes, out)
 
 
 def cmd_generate(a):
-    import torch
-    from .model import load_checkpoint, sample
-    torch.manual_seed(a.seed)
-    model, vocab, _ = load_checkpoint(a.model, a.device)
-    tunes = sample(model, vocab, n=a.n, temperature=a.temperature, max_new_tokens=a.max_chars)
-    if not a.raw:
-        from .score import first_tune
-        tunes = [first_tune(t) for t in tunes]
-    if a.out:
-        _write_abc(tunes, a.out, raw=True)
-        print(f"wrote {len(tunes)} tunes to {a.out}")
-    else:
-        print("\n\n".join(t.strip() for t in tunes))
+    from microgpt.model import generate_from
+    tunes = generate_from(a.model, n=a.n, temperature=a.temperature, max_new_tokens=a.max_chars, seed=a.seed,
+                          device=a.device, raw=a.raw)
+    blocks.emit(tunes, a.out, "tunes")
 
 
 def _split_tunes(text):
+    # Not blocks.split_blocks: that strips each block, and the copy score counts a tune's trailing newline.
+    # Keeping it gives each tune back as the model wrote it, which is what the activity scores.
     parts = [p for p in text.replace("\r\n", "\n").split("\nX:")]
     return [p if p.startswith("X:") else "X:" + p for p in parts if p.strip()]
 
@@ -79,8 +72,8 @@ def cmd_score(a):
         tunes = _split_tunes(f.read())
     pool = []
     if a.pool:
-        blocks = data.load_pool(a.pool, a.data)
-        pool = [{"title": b.split("\n", 2)[1][2:] if b.count("\n") > 1 else None, "abc": b} for b in blocks]
+        real = data.load(a.pool, a.data)
+        pool = [{"title": b.split("\n", 2)[1][2:] if b.count("\n") > 1 else None, "abc": b} for b in real]
     rows = []
     for t in tunes:
         first = score.first_tune(t)
@@ -97,47 +90,6 @@ def cmd_score(a):
                "copies_35pct_plus": sum(r["copied"] >= 35 for r in rows),
                "pool": a.pool or "none (style and copy checks need --pool)"}
     print(json.dumps({"summary": summary, "tunes": rows} if a.verbose else summary, indent=1))
-
-
-def cmd_c4_data(a):
-    from . import connect4
-    path = os.path.join(a.data, f"{a.name}.json")
-    if os.path.exists(path):  # e.g. --name jigs: don't replace a tune corpus with games
-        try:
-            with open(path) as f:
-                old = json.load(f)
-        except ValueError:
-            old = None
-        if not isinstance(old, list) or (old and not str(old[0]).startswith(connect4.HEADER)):
-            sys.exit(f"{path} already exists and isn't a Connect Four corpus: pick another --name.")
-    blocks = connect4.generate_games(a.games, a.seed, a.bot, a.eps)
-    os.makedirs(a.data, exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(blocks, f)
-    summary, _ = connect4.score_text("\n\n".join(blocks))
-    print(json.dumps({"wrote": path, "games": len(blocks), "chars": sum(len(b) + 2 for b in blocks),
-                      "bot": a.bot, "eps": a.eps, "seed": a.seed, "mean_moves": summary["mean_moves"],
-                      "winners": summary["winners"]}, indent=1))
-    if len(blocks) < a.games:
-        print(f"note: only {len(blocks)} distinct games found; raise --eps for more variety", file=sys.stderr)
-
-
-def cmd_c4_score(a):
-    from . import connect4, data
-    with open(a.file) as f:
-        text = f.read()
-    pool = data.load_pool(a.pool, a.data) if a.pool else None
-    summary, rows = connect4.score_text(text, pool)
-    print(json.dumps({"summary": summary, "games": rows} if a.verbose else summary, indent=1))
-
-
-def cmd_c4_eval(a):
-    import torch
-    from . import connect4
-    from .model import load_checkpoint
-    torch.manual_seed(a.seed)
-    model, vocab, _ = load_checkpoint(a.model, a.device)
-    print(json.dumps(connect4.play_vs_bot(model, vocab, a.n, a.opponent, a.temperature, a.seed), indent=1))
 
 
 def read_tunes(paths):
@@ -200,7 +152,8 @@ def main(argv=None):
     s = sub.add_parser("train", help="train from scratch: --songs N --steps S")
     s.add_argument("--songs", type=int, default=0, help="N distinct jigs (0 = the whole corpus)")
     s.add_argument("--steps", type=int, default=2400)
-    s.add_argument("--corpus", default="jigs_first", help="jigs_first (one setting per tune) or jigs (all settings, the strong model)")
+    s.add_argument("--corpus", default="jigs_first", help="jigs_first (one setting per tune), jigs (all settings, the "
+                                                          "strong model), or a JSON list of ABC strings")
     s.add_argument("--vocab-from", help="reuse a checkpoint's vocabulary so the new model is compatible with it")
     s.add_argument("--seed", type=int, default=0)
     s.add_argument("--samples", type=int, default=8)
@@ -244,29 +197,6 @@ def main(argv=None):
     s.add_argument("--port", type=int, default=0, help="local port for the player (default: any free port)")
     s.add_argument("--no-open", action="store_true", help="print the player address without opening a browser")
     s.set_defaults(func=cmd_play)
-
-    s = sub.add_parser("c4-data", help="Connect Four: write self-play games to data/<name>.json for `train --corpus`")
-    s.add_argument("--games", type=int, default=100_000)
-    s.add_argument("--bot", choices=["smart", "random"], default="smart")
-    s.add_argument("--eps", type=float, default=0.1, help="chance of a random move, keeps smart games varied")
-    s.add_argument("--seed", type=int, default=0)
-    s.add_argument("--name", default="connect4", help="corpus name (default: connect4)")
-    s.set_defaults(func=cmd_c4_data)
-
-    s = sub.add_parser("c4-score", help="Connect Four: check generated games (legal moves, endings, copies)")
-    s.add_argument("file", help="text file of generated games, e.g. from `jigai generate --out` (not --raw: "
-                                "raw samples end mid-game, and the cut-off game would count as a mistake)")
-    s.add_argument("--pool", help="training corpus name or JSON file, for the copy check (e.g. connect4)")
-    s.add_argument("--verbose", action="store_true")
-    s.set_defaults(func=cmd_c4_score)
-
-    s = sub.add_parser("c4-eval", help="Connect Four: the model plays games against a bot")
-    s.add_argument("--model", required=True)
-    s.add_argument("-n", type=int, default=200, help="games (the model moves first in half)")
-    s.add_argument("--opponent", choices=["random", "smart"], default="random")
-    s.add_argument("--temperature", type=float, default=0.0, help="0 = always its most likely legal move")
-    s.add_argument("--seed", type=int, default=0)
-    s.set_defaults(func=cmd_c4_eval)
 
     a = p.parse_args(argv)
     a.func(a)

@@ -1,6 +1,6 @@
-"""The 10.8M-parameter character-level GPT ("MicroGPT") used for every Jig AI run.
+"""The 10.8M-parameter character-level GPT ("MicroGPT"), with checkpoints and sampling.
 
-Same layer names and shapes as the original Modal code, so its checkpoints load unchanged.
+Same layer names and shapes as the original Jig AI Modal code, so its checkpoints load unchanged.
 """
 
 import json
@@ -131,9 +131,21 @@ def save_checkpoint(path, model, vocab, extra=None):
         json.dump(cfg, f, indent=1)
 
 
-def sample(model, vocab, n=4, temperature=0.8, max_new_tokens=500, device=None):
+def sample(model, vocab, n=4, temperature=0.8, max_new_tokens=500, device=None, start="X:"):
+    """n generations, each beginning with `start` (the opening of a block)."""
     device = device or next(model.parameters()).device
     model.eval()
-    ctx = torch.tensor([vocab.encode("X:")] * n, dtype=torch.long, device=device)
+    ctx = torch.tensor([vocab.encode(start)] * n, dtype=torch.long, device=device)
     out = model.generate(ctx, max_new_tokens=max_new_tokens, temperature=temperature)
     return [vocab.decode(row.tolist()) for row in out]
+
+
+def generate_from(path, n=8, temperature=0.8, max_new_tokens=500, seed=0, device=None, raw=False, start="X:"):
+    """Load a checkpoint and sample n blocks. raw=True keeps each whole generation (several blocks run together).
+
+    start is the text every generation begins with: "X:" alone, or a whole header line the corpus always uses."""
+    from .blocks import first_block
+    torch.manual_seed(seed)
+    model, vocab, _ = load_checkpoint(path, device)
+    out = sample(model, vocab, n=n, temperature=temperature, max_new_tokens=max_new_tokens, start=start)
+    return out if raw else [first_block(t) for t in out]

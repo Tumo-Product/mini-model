@@ -15,6 +15,8 @@ import os
 import random
 import urllib.request
 
+from microgpt.blocks import load_corpus, split_blocks
+
 TUNES_URL = "https://raw.githubusercontent.com/adactio/TheSession-data/main/json/tunes.json"
 DATA_DIR = os.environ.get("JIGAI_DATA", "data")
 
@@ -73,30 +75,12 @@ def prepare(source=None, out_dir=DATA_DIR):
     return meta
 
 
+MISSING_HINT = "run `jigai prepare-data` first (see README)."
+
+
 def load(name, data_dir=DATA_DIR):
-    path = os.path.join(data_dir, f"{name}.json")
-    if not os.path.exists(path):
-        raise SystemExit(f"{path} not found: run `jigai prepare-data` first (see README).")
-    with open(path) as f:
-        return json.load(f)
-
-
-def load_pool(name_or_path, data_dir=DATA_DIR):
-    """A corpus name (data/<name>.json) or the path of a JSON list of blocks, for the copy checks."""
-    if os.path.exists(name_or_path):
-        with open(name_or_path) as f:
-            return json.load(f)
-    return load(name_or_path, data_dir)
-
-
-def split_blocks(text):
-    """Text holding several X: blocks (tunes or games) -> the blocks, each stripped and starting with X:."""
-    blocks = []
-    for c in text.replace("\r\n", "\n").split("\nX:"):
-        c = c.strip()
-        if c:
-            blocks.append(c if c.startswith("X:") else "X:" + c)
-    return blocks
+    """A corpus by name (data/<name>.json), or the path of a JSON list of blocks."""
+    return load_corpus(name, data_dir, MISSING_HINT)
 
 
 def songs_subset(n, seed=0, data_dir=DATA_DIR):

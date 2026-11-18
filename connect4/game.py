@@ -1,6 +1,6 @@
-"""Connect Four for the same MicroGPT: generate games as text, score what the model writes, play it against bots.
+"""Connect Four as text for MicroGPT: generate games, score what the model writes, play it against bots.
 
-One game is one training block, in the same shape as a tune (starts with "X:", so `sample()` works unchanged):
+One game is one training block. It starts with "X:" like every block the model trains on:
 
   X:c4
   4453342271
@@ -17,7 +17,7 @@ play_vs_bot()     the model plays real games against a bot (random or smart) and
 
 import random
 
-from .data import split_blocks
+from microgpt.blocks import split_blocks
 
 ROWS, COLS = 6, 7
 HEADER = "X:c4"

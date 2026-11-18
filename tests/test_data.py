@@ -24,3 +24,9 @@ def test_songs_subset_is_stable(tmp_path):
     a = data.songs_subset(2, seed=3, data_dir=str(tmp_path))
     b = data.songs_subset(2, seed=3, data_dir=str(tmp_path))
     assert a == b and len(a) == 2
+
+
+def test_load_takes_a_corpus_name_or_a_json_path(tmp_path):
+    data.prepare(os.path.join(HERE, "fixtures", "tiny_tunes.json"), str(tmp_path))
+    by_name = data.load("jigs_first", str(tmp_path))
+    assert len(by_name) == 3 and data.load(str(tmp_path / "jigs_first.json")) == by_name

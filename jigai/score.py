@@ -12,6 +12,8 @@ tests/test_score_port.py checks every function against the JS originals via node
 
 import re
 
+from microgpt.blocks import first_block
+
 _DIA = {"C": 0, "D": 1, "E": 2, "F": 3, "G": 4, "A": 5, "B": 6}
 _STRIP = re.compile(r'"[^"]*"|\{[^}]*\}|![^!]*!')
 _NOTE_RE = re.compile(r"[_^=]*([A-Ga-gz])[,']*(\d*)(/*)(\d*)")
@@ -272,9 +274,7 @@ _VALID_KEY = re.compile(r"[A-G][b#]?(major|minor|dorian|mixolydian|aeolian|ionia
 _PART_END = re.compile(r":\||\|\]|\|\|")
 
 
-def first_tune(raw):
-    i = raw.find("\nX:", 2)
-    return raw[:i] if i > 0 else raw
+first_tune = first_block
 
 
 def parse_generated(raw):
